@@ -1,4 +1,6 @@
 ﻿using OpenQA.Selenium;
+using OpenQA.Selenium.Support.UI;
+using SeleniumExtras.WaitHelpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,10 +20,11 @@ namespace CalendarSync.Cli.PageObjects.Auth
         {
         }
 
-        public void Initialize()
+        public void Initialize(CancellationToken ct = default)
         {
-            _emailInputElement = WaitForElement(EmailInputSelector);
-            _submitButtonElement = WaitForElement("input[type=submit]");
+            _emailInputElement = WaitForElement(EmailInputSelector, ct);
+            _submitButtonElement = WaitForElement("input[type=submit]", ct);
+            _submitButtonElement.WaitUntilClickable(ct);
         }
 
         public void SubmitEmailAddress(string emailAddress)

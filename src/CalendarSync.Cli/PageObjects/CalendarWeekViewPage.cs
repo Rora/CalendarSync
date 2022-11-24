@@ -10,34 +10,40 @@ namespace CalendarSync.Cli.PageObjects
     internal class CalendarWeekViewPage : PageBase
     {
         private const string ToggleLeftPaneButtonSelector = "button[data-automation-type=\"RibbonButton\"] i[data-icon-name=\"LineHorizontal3Regular\"]";
-        private const string ShowAllOrSelectedCalendarsToggleSelector = "div[aria-label=\"calendar list\"] div[role=\"listbox\"] > button";
-        private const string CalendarButtonsSelector = "div[aria-label=\"calendar list\"] ul div[role=\"listbox\"] button[role=\"option\"]";
-        private IWebElement _toggleLeftPaneButton;
+        private const string ShowAllOrSelectedCalendarsToggleSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] > button";
+        private const string CalendarButtonsSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"]";
 
         public CalendarWeekViewPage(IWebDriver driver)
             : base(driver)
         {
         }
 
-        public void Initialize()
+        public void Initialize(CancellationToken ct = default)
         {
-            _toggleLeftPaneButton = WaitForElement(ToggleLeftPaneButtonSelector);
+            WaitForElement(ToggleLeftPaneButtonSelector, ct);
         }
         
         public void EnsureSingleCalendarIsSelected(string calendarName)
         {
             calendarName = calendarName.ToLower();
-            _toggleLeftPaneButton.Click();
-
-            var calendarButtons = WaitForElements(CalendarButtonsSelector);
+            var toggleLeftPaneButton = WaitForElement(ToggleLeftPaneButtonSelector);
+            
+            //For some reason the first click doesn't always work
+            toggleLeftPaneButton.ClickViaJS();
+            var calendarButtons = WaitForElements(CalendarButtonsSelector, TimeSpan.FromSeconds(30), 
+                msBetweenTries: 100,
+                actionBetweenTries: (_) => toggleLeftPaneButton.ClickViaJS());
+            
+            
             var calendarButtonToSelect = calendarButtons.FirstOrDefault(cb => cb.GetAttribute("title").ToLower() == calendarName);
-            if(calendarButtonToSelect == null)
-            {
-                WaitForElement(ShowAllOrSelectedCalendarsToggleSelector).Click();
-                calendarButtons = WaitForElements(CalendarButtonsSelector);
-                calendarButtonToSelect = calendarButtons.FirstOrDefault(cb => cb.GetAttribute("title").ToLower() != calendarName);
 
-                if(calendarButtonToSelect == null)
+            if (calendarButtonToSelect == null)
+            {
+                WaitForElement(ShowAllOrSelectedCalendarsToggleSelector).ClickViaJS();
+                calendarButtons = WaitForElements(CalendarButtonsSelector);
+                calendarButtonToSelect = calendarButtons.FirstOrDefault(cb => cb.GetAttribute("title").ToLower() == calendarName);
+
+                if (calendarButtonToSelect == null)
                 {
                     throw new InvalidOperationException($"Could not find calendar '{calendarName}' to select");
                 }
@@ -46,7 +52,8 @@ namespace CalendarSync.Cli.PageObjects
             //Ensure that the calendar is selected
             if(calendarButtonToSelect.GetAttribute("aria-selected") != "true")
             {
-                calendarButtonToSelect.Click();
+                var calendarTitle = calendarButtonToSelect.GetAttribute("title");
+                calendarButtonToSelect.ClickViaJS();
             }
 
             //Unselect the other buttons
@@ -56,11 +63,11 @@ namespace CalendarSync.Cli.PageObjects
 
             foreach (var calendarButton in calendarButtonsToUnSelect)
             {
-                calendarButton.Click();
+                calendarButton.ClickViaJS();
             }
 
             //Collapse the pane when done
-            _toggleLeftPaneButton.Click();
+            toggleLeftPaneButton.ClickViaJS();
         }
     }
 }
