@@ -21,20 +21,17 @@ namespace CalendarSync.Cli.PageObjects
             return WaitForElements(cssSelector, timeout, ct: ct).Single();
         }
 
-        protected IEnumerable<IWebElement> WaitForElements(string cssSelector, CancellationToken ct = default)
+        protected IEnumerable<IWebElement> WaitForElements(string cssSelector, TimeSpan? timeout = null, 
+            int msBetweenTries = 10, ISearchContext? searchContext = null, Action<IWebDriver>? actionBetweenTries = null, 
+            int minimumElements = 1, CancellationToken ct = default)
         {
-            return WaitForElements(cssSelector, TimeSpan.FromSeconds(30), ct: ct);
-        }
-
-        protected IEnumerable<IWebElement> WaitForElements(string cssSelector, TimeSpan timeout, 
-            int msBetweenTries = 10, Action<IWebDriver>? actionBetweenTries = null, CancellationToken ct = default)
-        {
-            var timeoutDate = DateTime.Now + timeout;
+            var timeoutDate = DateTime.Now + (timeout ?? TimeSpan.FromSeconds(30));
+            searchContext = searchContext ?? _driver;
 
             while (DateTime.Now < timeoutDate)
             {
-                var els = _driver.FindElements(By.CssSelector(cssSelector));
-                if (els.Any())
+                var els = searchContext.FindElements(By.CssSelector(cssSelector));
+                if (els.Count >= minimumElements)
                 {
                     return els;
                 }

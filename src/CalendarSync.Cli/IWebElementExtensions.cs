@@ -14,9 +14,33 @@ namespace CalendarSync.Cli
     {
         public static IWebDriver? WebDriver { get; set; }
 
+        internal static bool IsStale(this IWebElement webElement)
+        {
+            return ExpectedConditions.StalenessOf(webElement)(WebDriver);
+        }
+
+        internal static IWebElement GetParentElement(this IWebElement webElement)
+        {
+            return webElement.FindElement(By.XPath("./.."));
+        }
+
+        internal static IEnumerable<IWebElement> GetSiblings(this IWebElement webElement)
+        {
+            //return webElement.GetParentElement()
+            //    .GetChildren()
+            //    .ToArray();
+            return webElement.FindElements(By.XPath("preceding-sibling::*")).Union(
+                webElement.FindElements(By.XPath("following-sibling::*")))
+                .ToArray();
+        }
+        internal static IEnumerable<IWebElement> GetChildren(this IWebElement webElement)
+        {
+            return webElement.FindElements(By.XPath("./child::*"));
+        }
+
         internal static void ClickViaJS(this IWebElement webElement)
         {
-            var executor = (IJavaScriptExecutor?) WebDriver ?? throw new InvalidOperationException("WebDriver is not set");
+            var executor = (IJavaScriptExecutor?)WebDriver ?? throw new InvalidOperationException("WebDriver is not set");
             executor.ExecuteScript("arguments[0].click();", webElement);
         }
 
