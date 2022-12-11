@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.CalendarEvent
 {
-    internal class CalendarEventDateTimeSpanParser
+    internal class CalendarItemDateTimeSpanParser
     {
         private const string TimeFormat = "HH:mm";
         private readonly Language _language;
@@ -52,32 +52,38 @@ namespace CalendarSync.Cli.PageObjects.CalendarEvent
             }
         };
 
-        public CalendarEventDateTimeSpanParser(Language language)
+        public CalendarItemDateTimeSpanParser(Language language)
         {
             _language = language;
         }
 
-        internal (DateTime from, DateTime to) ParseDateTimeSpan
+        internal (DateTime from, DateTime to, bool isAllDayItem) ParseDateTimeSpan
             (DateOrderEnum dateOrder, string dateTimePeriodText)
         {
-            var datePartMatches = Regex.Matches(dateTimePeriodText, @"\w+\s+(\d+)\s+(\w+)\s\d+");
-            var isMonthWrittenAsAWord = datePartMatches.Any();
-            if (!isMonthWrittenAsAWord)
+            var datePartMatches = Regex.Matches(dateTimePeriodText, @"\d+\/\d+\/\d+");
+            var isMonthWrittenAsAWord = !datePartMatches.Any();
+            if (isMonthWrittenAsAWord)
             {
-                datePartMatches = Regex.Matches(dateTimePeriodText, @"\d+\/\d+\/\d+");
+                //Matches tue 10 sep 2022 and tue sep 10 2222
+                datePartMatches = Regex.Matches(dateTimePeriodText, @"\w+\s+(\w+)\s+(\w+)\s\d+");
             }
 
-            //If the text only contains 1 date part, it's a single day event
-            if (datePartMatches.Count == 1)
+            switch (datePartMatches.Count)
             {
-                return ParseSingleDayDateTimeSpan(dateOrder, dateTimePeriodText, isMonthWrittenAsAWord);
-            }
+                case 1:
+                    //If the text only contains 1 date part, it's a single day event
+                    return ParseSingleDayDateTimeSpan(dateOrder, dateTimePeriodText, isMonthWrittenAsAWord);
 
-            //If the dateTime string contains more than 1 date part it's a multi day event
-            return ParseMultiDayDateTimeSpan(dateOrder, dateTimePeriodText, isMonthWrittenAsAWord);
+                case 2:
+                    //If the dateTime string contains more than 1 date part it's a multi day event
+                    return ParseMultiDayDateTimeSpan(dateOrder, dateTimePeriodText, isMonthWrittenAsAWord);
+
+                default:
+                    throw new InvalidOperationException($"Could not detect date/datetime parts in '{dateTimePeriodText}'");
+            }
         }
 
-        private (DateTime from, DateTime to) ParseMultiDayDateTimeSpan(DateOrderEnum dateOrder,
+        private (DateTime from, DateTime to, bool isAllDayItem) ParseMultiDayDateTimeSpan(DateOrderEnum dateOrder,
             string dateTimePeriodText, bool isMonthWrittenAsAWord)
         {
             var allDayMultiDatesPattern = isMonthWrittenAsAWord
@@ -95,7 +101,8 @@ namespace CalendarSync.Cli.PageObjects.CalendarEvent
                 var date2 = ParseDate(dateOrder, isMonthWrittenAsAWord, date2Str);
 
                 return (date1.ToDateTime(new TimeOnly(0, 0)),
-                    date2.ToDateTime(new TimeOnly(0, 0)));
+                    date2.ToDateTime(new TimeOnly(0, 0)),
+                    isAllDayItem: true);
             }
 
             //Multi day event with a time
@@ -111,10 +118,11 @@ namespace CalendarSync.Cli.PageObjects.CalendarEvent
             var endTimeStr = timedMutliDatesMatch.Groups[4].Value;
 
             return (ParseDateTime(startDateStr, startTimeStr, dateOrder, isMonthWrittenAsAWord),
-                ParseDateTime(endDateStr, endTimeStr, dateOrder, isMonthWrittenAsAWord));
+                ParseDateTime(endDateStr, endTimeStr, dateOrder, isMonthWrittenAsAWord),
+                isAllDayItem: false);
         }
 
-        private (DateTime from, DateTime to) ParseSingleDayDateTimeSpan
+        private (DateTime from, DateTime to, bool isAllDayItem) ParseSingleDayDateTimeSpan
             (DateOrderEnum dateOrder, string dateTimePeriodText, bool isMonthWrittenAsAWord)
         {
             var dateTimePattern = isMonthWrittenAsAWord
@@ -130,7 +138,9 @@ namespace CalendarSync.Cli.PageObjects.CalendarEvent
 
             if (isAllDay)
             {
-                return (date.ToDateTime(new TimeOnly()), date.ToDateTime(new TimeOnly()));
+                return (date.ToDateTime(new TimeOnly()), 
+                    date.ToDateTime(new TimeOnly()),
+                    isAllDayItem: true);
             }
 
             //Single date even with a time
@@ -141,7 +151,8 @@ namespace CalendarSync.Cli.PageObjects.CalendarEvent
             var endTime = TimeOnly.ParseExact(endTimeText, TimeFormat);
 
             return (date.ToDateTime(startTime),
-                date.ToDateTime(endTime));
+                date.ToDateTime(endTime),
+                isAllDayItem: false);
         }
 
         private DateOnly ParseDate(DateOrderEnum dateOrder, bool isMonthWrittenAsAWord, 

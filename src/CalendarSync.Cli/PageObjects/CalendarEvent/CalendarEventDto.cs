@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.CalendarEvent
 {
-    internal record CalendarEventDto(
+    internal record CalendarItemDto(
         string CalendarItemId,
         string Name,
+        string CalendarName,
         string Description,
         DateTime StartDateTime,
         DateTime EndDateTime,

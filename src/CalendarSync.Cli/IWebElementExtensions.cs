@@ -24,6 +24,15 @@ namespace CalendarSync.Cli
             return webElement.FindElement(By.XPath("./.."));
         }
 
+        internal static IWebElement GetParentElement(this IWebElement webElement, int nrOfHopsUp)
+        {
+            for (int i = 0; i < nrOfHopsUp; i++)
+            {
+                webElement = webElement.GetParentElement();
+            }
+            return webElement;
+        }
+
         internal static IEnumerable<IWebElement> GetSiblings(this IWebElement webElement)
         {
             //return webElement.GetParentElement()

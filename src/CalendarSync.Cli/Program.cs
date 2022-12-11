@@ -20,7 +20,7 @@ var options = await JsonSerializer.DeserializeAsync<CalendarSyncOptions>(options
 
 var webDriverOptions = new ChromeOptions();
 //Opening the dev tools prevents 'tutorial tips' from popping up when opening the calendar
-webDriverOptions.AddArguments("--auto-open-devtools-for-tabs");
+//webDriverOptions.AddArguments("--auto-open-devtools-for-tabs");
 var userDataDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "source-cal-selenium-data");
 Directory.CreateDirectory(userDataDir);
 webDriverOptions.AddArguments(@"user-data-dir=" + userDataDir);
@@ -32,7 +32,7 @@ try
     webDriver.Url = "https://outlook.office.com/calendar/view/week";
 
     var lang = Language.English;
-    var calendarEventDateTimeSpanParser = new CalendarEventDateTimeSpanParser(lang);
+    var calendarEventDateTimeSpanParser = new CalendarItemDateTimeSpanParser(lang);
 
     //Depending if the user is already logged in, or logged in because of their windows identity
     //the initial request might turn into a sign in page or not
@@ -91,9 +91,17 @@ try
 
     calendarWeekViewPage.EnsureSingleCalendarIsSelected(options.Source.CalendarName);
     calendarWeekViewPage.ReadDateOrder();
-    calendarWeekViewPage.GetCalanderEvents();
-
-
+    var calendarItems = calendarWeekViewPage.GetCalendarItems();
+    if (calendarItems.Any(ci => ci.CalendarName != options.Source.CalendarName))
+    {
+        var otherCalendarNames = calendarItems
+            .Where(ci => ci.CalendarName != options.Source.CalendarName)
+            .Select(ci => ci.CalendarName)
+            .Distinct()
+            .ToArray();
+        throw new InvalidOperationException($"Found calendar items of another calendar than the one that should've been selected. (expected: '{options.Source.CalendarName}', unexpected findings: '{string.Join(", ", otherCalendarNames)}'");
+    }
+    
     Console.WriteLine("Done");
 }
 finally

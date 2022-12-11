@@ -1,4 +1,5 @@
 ﻿using CalendarSync.Cli.PageObjects.CalendarEvent;
+using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Interactions;
 using SeleniumExtras.WaitHelpers;
@@ -19,17 +20,17 @@ namespace CalendarSync.Cli.PageObjects
         private const string CalendarButtonsSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"]";
         private const string CalanderWeekNavigationDropdownIconSelector = "div[data-app-section=\"CalendarModuleNavigationBar\"] > button.ms-Button.ms-Button--action.ms-Button--command i[data-icon-name=\"ChevronDown\"]";
 
+        private const string SingleDayCalendarItemSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent";
+        private const string SingleAndMultiDayCalendarItemSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent, div[data-app-section=\"calendar-view-header-0\"] div.calendar-SelectionStyles-resizeBoxParent";
+        private const string CalendarItemColorMarkerSelector = "div[role=\"button\"] div:first-child";
 
-        private const string CalendarEventSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent";
-        private const string CalendarEventColorMarkerSelector = "div[role=\"button\"] div:first-child";
-        private const string CalendarHeaderDayNrSelector = "div[data-app-section=\"calendar-view-header-0\"] div[data-tabid=\"surfaceHeader_{0}\"] time";
-
-        private const string CalendarEventCardTimeSelector = "div[data-app-section=\"CalendarItemPeek\"] span[aria-label=\"Time\"]";
-        private const string CalendarEventCardFullScreenButtonSelector = "div[data-app-section=\"CalendarItemPeek\"] i[data-icon-name=\"FullScreen\"]";
-        private const string CalendarEventModalSelector = ".ms-Dialog-main div[data-app-section=\"ReadingPane\"]";
-        private const string CalendarEventModalTimeIconSelector = "i[data-icon-name=\"ClockRegular\"]";
-        private const string CalendarEventModalDescriptionIconSelector = "i[data-icon-name=\"TextboxRegular\"]";
-        private readonly CalendarEventDateTimeSpanParser _calendarEventDateTimeSpanParser;
+        private const string CalendarItemCardTimeSelector = "div[data-app-section=\"CalendarItemPeek\"] span[aria-label=\"Time\"]";
+        private const string CalendarItemCardFullScreenButtonSelector = "div[data-app-section=\"CalendarItemPeek\"] i[data-icon-name=\"FullScreen\"]";
+        private const string CalendarItemModalSelector = ".ms-Dialog-main div[data-app-section=\"ReadingPane\"]";
+        private const string CalendarItemModalTimeIconSelector = "i[data-icon-name=\"ClockRegular\"]";
+        private const string CalendarItemModalCalendarIconSelector = "i[data-icon-name=\"CalendarEmptyRegular\"]";
+        private const string CalendarItemModalDescriptionIconSelector = "i[data-icon-name=\"TextboxRegular\"]";
+        private readonly CalendarItemDateTimeSpanParser _calendarItemDateTimeSpanParser;
         private string? _calendarColor;
         private DateOrderEnum? _dateOrder;
 
@@ -39,10 +40,11 @@ namespace CalendarSync.Cli.PageObjects
             set => _calendarColor = value;
         }
 
-        public CalendarWeekViewPage(IWebDriver driver, CalendarEventDateTimeSpanParser calendarEventDateTimeSpanParser)
+        public CalendarWeekViewPage(IWebDriver driver,
+            CalendarItemDateTimeSpanParser calendarEventDateTimeSpanParser)
             : base(driver)
         {
-            _calendarEventDateTimeSpanParser = calendarEventDateTimeSpanParser;
+            _calendarItemDateTimeSpanParser = calendarEventDateTimeSpanParser;
         }
 
         public void Initialize(CancellationToken ct = default)
@@ -53,15 +55,8 @@ namespace CalendarSync.Cli.PageObjects
         public void EnsureSingleCalendarIsSelected(string calendarName)
         {
             calendarName = calendarName.ToLower();
-            var toggleLeftPaneButton = WaitForElement(ToggleLeftPaneButtonSelector);
 
-            //For some reason the first click doesn't always work
-            toggleLeftPaneButton.ClickViaJS();
-            var calendarButtons = WaitForElements(CalendarButtonsSelector, TimeSpan.FromSeconds(30),
-                msBetweenTries: 100,
-                actionBetweenTries: (_) => toggleLeftPaneButton.ClickViaJS());
-
-
+            var calendarButtons = OpenLeftPaneAndGetCalendarButtons();
             var calendarButtonToSelect = calendarButtons.FirstOrDefault(cb => cb.GetAttribute("title").ToLower() == calendarName);
 
             if (calendarButtonToSelect == null)
@@ -96,7 +91,41 @@ namespace CalendarSync.Cli.PageObjects
             }
 
             //Collapse the pane when done
+            var toggleLeftPaneButton = WaitForElement(ToggleLeftPaneButtonSelector);
             toggleLeftPaneButton.ClickViaJS();
+
+            //Wait for the calendar items to switch
+            WaitUntilSingleDayCalendarItemsMatchInColor();
+        }
+
+        private IEnumerable<IWebElement> OpenLeftPaneAndGetCalendarButtons()
+        {
+            var retryNr = 0;
+            while (true)
+            {
+                try
+                {
+                    var toggleLeftPaneButton = WaitForElement(ToggleLeftPaneButtonSelector);
+
+                    //For some reason the first click doesn't always work
+                    toggleLeftPaneButton.ClickViaJS();
+                    var calendarButtons = WaitForElements(CalendarButtonsSelector, TimeSpan.FromSeconds(30),
+                        msBetweenTries: 100,
+                        actionBetweenTries: (_) => toggleLeftPaneButton.ClickViaJS());
+
+                    return calendarButtons;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    retryNr++;
+                    Console.WriteLine($"Failed to expand left pane because of stale element reference exception, retry nr {retryNr}");
+
+                    if (retryNr > 10)
+                    {
+                        throw;
+                    }
+                }
+            }
         }
 
         public void ReadDateOrder()
@@ -110,7 +139,7 @@ namespace CalendarSync.Cli.PageObjects
                 _dateOrder = DateOrderEnum.DayMonthYear;
                 return;
             }
-            
+
             //Matches November 28 – December 4, 2022
             if (Regex.IsMatch(currentCalendarViewPeriodText, @"^\w+\s+\d+\s+[^\s]\s+\w+\s\d+"))
             {
@@ -135,51 +164,112 @@ namespace CalendarSync.Cli.PageObjects
             throw new InvalidOperationException("Could not parse '{currentCalendarViewPeriodText}' to decide wether the month or the day comes first");
         }
 
-        public void GetCalanderEvents()
+        public IEnumerable<CalendarItemDto> GetCalendarItems()
         {
-            //We're hoping it won't turn stale after this call which isn't reliable
-            //better to keep track of last 'time' we handled and reload events on stale
-            var calendarEventEls = GetCalendarEvents();
+            var calendarItemElements = GetCalendarItemElements();
 
-            if (!calendarEventEls.Any())
+            if (!calendarItemElements.Any())
             {
-                return;
+                return Enumerable.Empty<CalendarItemDto>();
             }
 
-            var calendarEvents = new List<CalendarEventDto>();
+            var calendarItems = new List<CalendarItemDto>();
+            var retryCount = 0;
 
-            //TODO refresh elements after every iteration and skip ones already analyzed by id
-            //TODO retry on stale element exc
-            foreach (var calendarEvent in calendarEventEls)
+            //TODO throw error 
+            while (calendarItems.Count < 1000
+                && retryCount < 100)
             {
-                var calendarItemId = calendarEvent.GetAttribute("data-calitemid");
+                try
+                {
+                    for (int i = 0; i < calendarItemElements.Count; i++)
+                    {
+                        var calendarItemElement = calendarItemElements[i];
+                        var calendarItemId = calendarItemElement.GetAttribute("data-calitemid");
 
-                calendarEvent.Click();
+                        //Skip already handled items
+                        if (calendarItems.Any(ce => ce.CalendarItemId == calendarItemId))
+                        {
+                            continue;
+                        }
 
-                InitializeCalendarItemCard();
+                        var calendarItem = OpenAndParseCalendarItem(calendarItemElement, calendarItemId);
+                        calendarItems.Add(calendarItem);
+                        CloseCalendarItem();
+                    }
 
-                var calendarEventCardFullScreenButton = WaitForElement(CalendarEventCardFullScreenButtonSelector);
-                calendarEventCardFullScreenButton.Click();
-                var calendarEventModal = WaitForElement(CalendarEventModalSelector);
+                    //When done, exit this loop
+                    break;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    retryCount++;
+                    Console.WriteLine($"Retrying to read calendar items because of stale element exception. Retry count {retryCount}");
 
-                var name = GetName(calendarEventModal);
-                var dateTimeText = GetTextByIconElement(calendarEventModal, CalendarEventModalTimeIconSelector);
-                var descriptionText = GetTextByIconElement(calendarEventModal, CalendarEventModalDescriptionIconSelector, isOptional: true);
+                    //Refetch these on every try to prevent stale elements
+                    calendarItemElements = GetCalendarItemElements();
+                }
+                catch (ElementClickInterceptedException)
+                {
+                    Console.WriteLine($"Reading calendar item failed because of an {nameof(ElementClickInterceptedException)}, trying to close any unrelated panel");
 
-                (var startDateTime, var endDateTime) = _calendarEventDateTimeSpanParser.ParseDateTimeSpan(_dateOrder!.Value, dateTimeText);
-                calendarEvents.Add(new CalendarEventDto(calendarItemId, name, descriptionText, startDateTime, endDateTime, IsAllDay: false));
+                    if (!TryCloseAnyUnrelatedPopIn())
+                    {
+                        Console.WriteLine("Could not find any unrelated panel to close");
+                    }
 
-                var action = new Actions(_driver);
-                action.SendKeys(Keys.Escape).Build().Perform();
-                WaitForElementToVanish(CalendarEventModalSelector);
+                    retryCount++;
+                    Console.WriteLine($"Closed an unrelated panel, retrying. Retry count {retryCount}");
+                }
             }
 
-            const string ValueCssSelector = ".allowTextSelection > div";
-            const string NameValueCssSelector = "span.allowTextSelection";
+            return calendarItems;
+        }
+
+        private bool TryCloseAnyUnrelatedPopIn()
+        {
+            var ringerOffIcons = _driver.FindElements(By.CssSelector("i[data-icon-name=\"RingerOff\"]"));
+            if (!ringerOffIcons.Any())
+            {
+                return false;
+            }
+
+            var reminderPanel = ringerOffIcons[0].GetParentElement(7);
+            reminderPanel.FindElement(By.CssSelector("i[data-icon-name=\"Cancel\"]"));
+            reminderPanel.Click();
+            return true;
+        }
+
+        private void CloseCalendarItem()
+        {
+            var action = new Actions(_driver);
+            action.SendKeys(Keys.Escape).Build().Perform();
+            WaitForElementToVanish(CalendarItemModalSelector);
+        }
+
+        private CalendarItemDto OpenAndParseCalendarItem(IWebElement calendarItemElement, string calendarItemId)
+        {
+            calendarItemElement.Click();
+
+            InitializeCalendarItemCard();
+
+            var calendarEventCardFullScreenButton = WaitForElement(CalendarItemCardFullScreenButtonSelector);
+            calendarEventCardFullScreenButton.Click();
+            var calendarEventModal = WaitForElement(CalendarItemModalSelector);
+
+            var name = GetName(calendarEventModal);
+            var dateTimeText = GetTextByIconElement(calendarEventModal, CalendarItemModalTimeIconSelector);
+            var calendarName = GetTextByIconElement(calendarEventModal, CalendarItemModalCalendarIconSelector);
+            var descriptionText = GetTextByIconElement(calendarEventModal, CalendarItemModalDescriptionIconSelector, isOptional: true);
+
+            (var startDateTime, var endDateTime, var isAllDayItem) = _calendarItemDateTimeSpanParser.ParseDateTimeSpan(_dateOrder!.Value, dateTimeText);
+            return new CalendarItemDto(calendarItemId, name, calendarName, descriptionText, startDateTime, endDateTime, IsAllDay: false);
 
             static string GetName(IWebElement calendarEventModal)
             {
-                var secondRowIcon = calendarEventModal.FindElement(By.CssSelector(CalendarEventModalTimeIconSelector));
+                const string NameValueCssSelector = "span.allowTextSelection";
+
+                var secondRowIcon = calendarEventModal.FindElement(By.CssSelector(CalendarItemModalTimeIconSelector));
                 var rowsParent = secondRowIcon.GetParentElement().GetParentElement().GetParentElement().GetParentElement();
                 var nameRow = rowsParent.GetChildren().First().FindElement(By.CssSelector(NameValueCssSelector));
                 return nameRow.Text;
@@ -188,6 +278,8 @@ namespace CalendarSync.Cli.PageObjects
             static string GetTextByIconElement(IWebElement calendarEventModal,
                 string iconSelector, bool isOptional = false)
             {
+                const string ValueCssSelector = ".allowTextSelection > div";
+
                 var icons = calendarEventModal.FindElements(By.CssSelector(iconSelector));
                 if (!icons.Any())
                 {
@@ -208,7 +300,7 @@ namespace CalendarSync.Cli.PageObjects
             var succes = false;
             do
             {
-                var calendarTimeElement = WaitForElement(CalendarEventCardTimeSelector);
+                var calendarTimeElement = WaitForElement(CalendarItemCardTimeSelector);
                 if (!string.IsNullOrWhiteSpace(calendarTimeElement.Text))
                 {
                     succes = true;
@@ -225,18 +317,20 @@ namespace CalendarSync.Cli.PageObjects
             }
         }
 
-        private ReadOnlyCollection<IWebElement> GetCalendarEvents()
+        private ReadOnlyCollection<IWebElement> WaitUntilSingleDayCalendarItemsMatchInColor()
         {
             ReadOnlyCollection<IWebElement> calendarEventEls;
             var timeOut = DateTime.Now + TimeSpan.FromSeconds(10);
             do
             {
-                calendarEventEls = _driver.FindElements(By.CssSelector(CalendarEventSelector));
+                calendarEventEls = _driver.FindElements(By.CssSelector(SingleDayCalendarItemSelector));
                 if (calendarEventEls.Any() &&
-                   calendarEventEls.All(e => e.FindElement(By.CssSelector(CalendarEventColorMarkerSelector)).GetCssValue("background-color") == CalendarColor))
+                   calendarEventEls
+                   .All(e => e.FindElement(By.CssSelector(CalendarItemColorMarkerSelector))
+                              .GetCssValue("background-color") == CalendarColor))
                 {
                     Thread.Sleep(600); //Don't return if the UI is still rendering
-                    if(calendarEventEls.First().IsStale())
+                    if (calendarEventEls.First().IsStale())
                     {
                         continue;
                     }
@@ -247,6 +341,11 @@ namespace CalendarSync.Cli.PageObjects
             }
             while (DateTime.Now < timeOut);
             return calendarEventEls;
+        }
+
+        private ReadOnlyCollection<IWebElement> GetCalendarItemElements()
+        {
+            return _driver.FindElements(By.CssSelector(SingleAndMultiDayCalendarItemSelector));
         }
     }
 }

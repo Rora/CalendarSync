@@ -26,7 +26,7 @@ namespace CalendarSync.Cli.PageObjects
             int minimumElements = 1, CancellationToken ct = default)
         {
             var timeoutDate = DateTime.Now + (timeout ?? TimeSpan.FromSeconds(30));
-            searchContext = searchContext ?? _driver;
+            searchContext ??= _driver;
 
             while (DateTime.Now < timeoutDate)
             {
