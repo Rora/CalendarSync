@@ -80,7 +80,7 @@ try
         sw.Start();
         waitingForMfaPage.WaitForMfaToCompleteOrTimeout();
         sw.Stop();
-        Console.WriteLine($"Source calendar MFA completed or timed. Time taken: {sw.Elapsed.ToString()}");
+        Console.WriteLine($"Source calendar MFA completed or timed. Time taken: {sw.Elapsed}");
 
         var keepMeSignedInPage = new KeepMeSignedInPage(webDriver);
         keepMeSignedInPage.Initialize();
@@ -114,6 +114,9 @@ try
     {
         throw new InvalidOperationException($"Selected calendar {addCalendarDialog.SelectedCalendarName} did not match expected calendar name {options.Source.CalendarName}");
     }
+
+    addCalendarDialog.SetTitle("TestEvent");
+    addCalendarDialog.SetDateTimePeriod(DateTime.Now.Date.AddMonths(-18).AddHours(10), DateTime.Now.Date.AddHours(11));
 
     Console.WriteLine("Done");
 }

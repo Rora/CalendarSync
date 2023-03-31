@@ -53,6 +53,11 @@ namespace CalendarSync.Cli.PageObjects.AddCalendarItem
             var fromDatePickerIcon = datePickerIcons[0];
             var toDatePickerIcon = datePickerIcons[1];
 
+            fromDatePickerIcon.Click();
+            var fromDatePicker = new DatePicker(_webDriver);
+            fromDatePicker.Initialize();
+            fromDatePicker.SelectDate(DateOnly.FromDateTime(fromDateTime));
+
 
             return this;
         }

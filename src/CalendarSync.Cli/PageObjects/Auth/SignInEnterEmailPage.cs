@@ -13,8 +13,8 @@ namespace CalendarSync.Cli.PageObjects.Auth
     internal class SignInEnterEmailPage : PageComponentBase
     {
         private const string EmailInputSelector = "input[type=email]";
-        private IWebElement _emailInputElement;
-        private IWebElement _submitButtonElement;
+        private IWebElement? _emailInputElement;
+        private IWebElement? _submitButtonElement;
 
         public SignInEnterEmailPage(IWebDriver driver)
             : base(driver)
@@ -23,15 +23,15 @@ namespace CalendarSync.Cli.PageObjects.Auth
 
         public void Initialize(CancellationToken ct = default)
         {
-            _emailInputElement = WaitForElement(EmailInputSelector, ct);
-            _submitButtonElement = WaitForElement("input[type=submit]", ct);
+            _emailInputElement = WaitForElement(EmailInputSelector, ct: ct);
+            _submitButtonElement = WaitForElement("input[type=submit]", ct: ct);
             _submitButtonElement.WaitUntilClickable(ct);
         }
 
         public void SubmitEmailAddress(string emailAddress)
         {
-            _emailInputElement.SendKeys(emailAddress);
-            _submitButtonElement.Submit();
+            _emailInputElement!.SendKeys(emailAddress);
+            _submitButtonElement!.Submit();
             WaitForElementToVanish(EmailInputSelector);
         }
     }

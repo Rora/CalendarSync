@@ -23,7 +23,7 @@ namespace CalendarSync.Cli.PageObjects
         private const string ShowAllOrSelectedCalendarsToggleSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] > button";
         private const string CalendarButtonsSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"]";
         private const string LoadCalendarSpinnerSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"] .ms-Spinner-circle.ms-Spinner--small";
-        private const string CalanderWeekNavigationDropdownIconSelector = "div[data-app-section=\"CalendarModuleNavigationBar\"] > button.ms-Button.ms-Button--action.ms-Button--command i[data-icon-name=\"ChevronDown\"]";
+        private const string CalanderWeekNavigationDropdownIconSelector = "div[data-app-section=\"CalendarModuleSurfaceNavigationBar\"] > button.ms-Button.ms-Button--action.ms-Button--command i[data-icon-name=\"ChevronDown\"]";
 
         private const string SingleDayCalendarItemSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent";
         private const string SingleAndMultiDayCalendarItemSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent, div[data-app-section=\"calendar-view-header-0\"] div.calendar-SelectionStyles-resizeBoxParent";
@@ -54,7 +54,7 @@ namespace CalendarSync.Cli.PageObjects
 
         public void Initialize(CancellationToken ct = default)
         {
-            WaitForElement(ToggleLeftPaneButtonSelector, ct);
+            WaitForElement(ToggleLeftPaneButtonSelector, ct: ct);
         }
 
         public void EnsureSingleCalendarIsSelected(string calendarName)
@@ -337,7 +337,7 @@ namespace CalendarSync.Cli.PageObjects
                               .GetCssValue("background-color") == CalendarColor))
                 {
                     Thread.Sleep(600); //Don't return if the UI is still rendering
-                    if (calendarEventEls.First().IsStale())
+                    if (!calendarEventEls.Any() || calendarEventEls.First().IsStale())
                     {
                         continue;
                     }
