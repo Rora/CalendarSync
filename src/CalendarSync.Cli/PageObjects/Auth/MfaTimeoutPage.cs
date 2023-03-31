@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.Auth
 {
-    internal class MfaTimeoutPage : PageBase
+    internal class MfaTimeoutPage : PageComponentBase
     {
         private const string WaitingForMfaTextSelector = "#idDiv_SAASTO_Title";
 

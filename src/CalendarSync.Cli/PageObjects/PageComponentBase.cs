@@ -2,13 +2,13 @@
 
 namespace CalendarSync.Cli.PageObjects
 {
-    internal abstract class PageBase
+    internal abstract class PageComponentBase
     {
-        protected IWebDriver _driver;
+        protected IWebDriver _webDriver;
 
-        protected PageBase(IWebDriver driver)
+        protected PageComponentBase(IWebDriver webDriver)
         {
-            this._driver = driver;
+            this._webDriver = webDriver;
         }
 
         protected IWebElement WaitForElement(string cssSelector, CancellationToken ct = default)
@@ -26,7 +26,7 @@ namespace CalendarSync.Cli.PageObjects
             int minimumElements = 1, CancellationToken ct = default)
         {
             var timeoutDate = DateTime.Now + (timeout ?? TimeSpan.FromSeconds(30));
-            searchContext ??= _driver;
+            searchContext ??= _webDriver;
 
             while (DateTime.Now < timeoutDate)
             {
@@ -37,7 +37,7 @@ namespace CalendarSync.Cli.PageObjects
                 }
                 Thread.Sleep(msBetweenTries);
                 ct.ThrowIfCancellationRequested();
-                actionBetweenTries?.Invoke(_driver);
+                actionBetweenTries?.Invoke(_webDriver);
             }
 
             throw new InvalidOperationException("Timeout reached before element was found");
@@ -49,7 +49,7 @@ namespace CalendarSync.Cli.PageObjects
 
             while (DateTime.Now < timeoutDate)
             {
-                var els = _driver.FindElements(By.CssSelector(cssSelector));
+                var els = _webDriver.FindElements(By.CssSelector(cssSelector));
                 if (!els.Any())
                 {
                     return;

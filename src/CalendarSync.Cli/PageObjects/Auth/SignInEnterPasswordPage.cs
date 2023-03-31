@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.Auth
 {
-    internal class SignInEnterPasswordPage : PageBase
+    internal class SignInEnterPasswordPage : PageComponentBase
     {
         private const string PasswordInputSelector = "input[type=password]";
         private IWebElement _passwordInputElement;

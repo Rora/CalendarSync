@@ -1,10 +1,12 @@
 ﻿// See https://aka.ms/new-console-template for more information
-using CalendarSync.Cli;
 using CalendarSync.Cli.Dto;
+using CalendarSync.Cli.FileLock;
 using CalendarSync.Cli.PageObjects;
 using CalendarSync.Cli.PageObjects.Auth;
 using CalendarSync.Cli.PageObjects.CalendarEvent;
+using CalendarSync.Cli.Selenium;
 using OpenQA.Selenium.Chrome;
+using System;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -14,15 +16,19 @@ if(!File.Exists(optionsFilePath))
     throw new InvalidOperationException($"Please create '{optionsFilePath}', content structure should match '{typeof(CalendarSyncOptions).FullName}'.");
 }
 
+//Read options
 using var optionsFileStream = File.OpenRead(optionsFilePath);
 var options = await JsonSerializer.DeserializeAsync<CalendarSyncOptions>(optionsFileStream)
     ?? throw new InvalidOperationException($"Could not parse '{optionsFilePath}'");
 
+var userDataDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "source-cal-selenium-data");
+Directory.CreateDirectory(userDataDir);
+
+SeleniumProcessKiller.KillExistingSeleniumProcessesForProfile(userDataDir);
+
 var webDriverOptions = new ChromeOptions();
 //Opening the dev tools prevents 'tutorial tips' from popping up when opening the calendar
 //webDriverOptions.AddArguments("--auto-open-devtools-for-tabs");
-var userDataDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "source-cal-selenium-data");
-Directory.CreateDirectory(userDataDir);
 webDriverOptions.AddArguments(@"user-data-dir=" + userDataDir);
 var webDriver = new ChromeDriver(webDriverOptions);
 
@@ -101,7 +107,14 @@ try
             .ToArray();
         throw new InvalidOperationException($"Found calendar items of another calendar than the one that should've been selected. (expected: '{options.Source.CalendarName}', unexpected findings: '{string.Join(", ", otherCalendarNames)}'");
     }
-    
+
+    var addCalendarDialog = calendarWeekViewPage.OpenAddCalendarItemDialog();
+
+    if(addCalendarDialog.SelectedCalendarName != options.Source.CalendarName)
+    {
+        throw new InvalidOperationException($"Selected calendar {addCalendarDialog.SelectedCalendarName} did not match expected calendar name {options.Source.CalendarName}");
+    }
+
     Console.WriteLine("Done");
 }
 finally

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.Auth
 {
-    internal class KeepMeSignedInPage : PageBase
+    internal class KeepMeSignedInPage : PageComponentBase
     {
         private const string DontShowAgainCheckBoxSelector = "#KmsiCheckboxField";
         private IWebElement _yesButton;

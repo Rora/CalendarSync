@@ -1,4 +1,6 @@
-﻿using CalendarSync.Cli.PageObjects.CalendarEvent;
+﻿using CalendarSync.Cli.PageObjects.AddCalendarItem;
+using CalendarSync.Cli.PageObjects.CalendarEvent;
+using CalendarSync.Cli.Selenium;
 using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Interactions;
@@ -13,11 +15,14 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects
 {
-    internal class CalendarWeekViewPage : PageBase
+    internal class CalendarWeekViewPage : PageComponentBase
     {
+        private const string AddCalendarItemButtonSelector = "div[data-unique-id=\"RibbonBottomBarContainer\"] div[data-unique-id=\"Ribbon-2545\"] button[data-unique-id=\"Ribbon-2545\"]";
+
         private const string ToggleLeftPaneButtonSelector = "button[data-automation-type=\"RibbonButton\"] i[data-icon-name=\"LineHorizontal3Regular\"]";
         private const string ShowAllOrSelectedCalendarsToggleSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] > button";
         private const string CalendarButtonsSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"]";
+        private const string LoadCalendarSpinnerSelector = "#leftPaneContainer div[role=\"complementary\"] div[role=\"listbox\"] button[role=\"option\"] .ms-Spinner-circle.ms-Spinner--small";
         private const string CalanderWeekNavigationDropdownIconSelector = "div[data-app-section=\"CalendarModuleNavigationBar\"] > button.ms-Button.ms-Button--action.ms-Button--command i[data-icon-name=\"ChevronDown\"]";
 
         private const string SingleDayCalendarItemSelector = "div[data-app-section=\"calendar-view-0\"] div.calendar-SelectionStyles-resizeBoxParent";
@@ -76,6 +81,9 @@ namespace CalendarSync.Cli.PageObjects
             {
                 var calendarTitle = calendarButtonToSelect.GetAttribute("title");
                 calendarButtonToSelect.ClickViaJS();
+                Thread.Sleep(100);
+                WaitForElementToVanish(LoadCalendarSpinnerSelector);
+                Thread.Sleep(100);
             }
 
             CalendarColor = WaitForElements("i", searchContext: calendarButtonToSelect).Single().GetCssValue("background-color");
@@ -228,7 +236,7 @@ namespace CalendarSync.Cli.PageObjects
 
         private bool TryCloseAnyUnrelatedPopIn()
         {
-            var ringerOffIcons = _driver.FindElements(By.CssSelector("i[data-icon-name=\"RingerOff\"]"));
+            var ringerOffIcons = _webDriver.FindElements(By.CssSelector("i[data-icon-name=\"RingerOff\"]"));
             if (!ringerOffIcons.Any())
             {
                 return false;
@@ -242,7 +250,7 @@ namespace CalendarSync.Cli.PageObjects
 
         private void CloseCalendarItem()
         {
-            var action = new Actions(_driver);
+            var action = new Actions(_webDriver);
             action.SendKeys(Keys.Escape).Build().Perform();
             WaitForElementToVanish(CalendarItemModalSelector);
         }
@@ -323,9 +331,8 @@ namespace CalendarSync.Cli.PageObjects
             var timeOut = DateTime.Now + TimeSpan.FromSeconds(10);
             do
             {
-                calendarEventEls = _driver.FindElements(By.CssSelector(SingleDayCalendarItemSelector));
-                if (calendarEventEls.Any() &&
-                   calendarEventEls
+                calendarEventEls = _webDriver.FindElements(By.CssSelector(SingleDayCalendarItemSelector));
+                if (calendarEventEls
                    .All(e => e.FindElement(By.CssSelector(CalendarItemColorMarkerSelector))
                               .GetCssValue("background-color") == CalendarColor))
                 {
@@ -345,7 +352,14 @@ namespace CalendarSync.Cli.PageObjects
 
         private ReadOnlyCollection<IWebElement> GetCalendarItemElements()
         {
-            return _driver.FindElements(By.CssSelector(SingleAndMultiDayCalendarItemSelector));
+            return _webDriver.FindElements(By.CssSelector(SingleAndMultiDayCalendarItemSelector));
+        }
+
+        public AddCalendarItemDialog OpenAddCalendarItemDialog()
+        {
+            var openAddCalendarItemDialogButton = WaitForElement(AddCalendarItemButtonSelector);
+            openAddCalendarItemDialogButton.Click();
+            return new AddCalendarItemDialog(_webDriver).Initialize();
         }
     }
 }

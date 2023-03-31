@@ -1,4 +1,5 @@
-﻿using OpenQA.Selenium;
+﻿using CalendarSync.Cli.Selenium;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 using System;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace CalendarSync.Cli.PageObjects.Auth
 {
-    internal class SignInEnterEmailPage : PageBase
+    internal class SignInEnterEmailPage : PageComponentBase
     {
         private const string EmailInputSelector = "input[type=email]";
         private IWebElement _emailInputElement;
